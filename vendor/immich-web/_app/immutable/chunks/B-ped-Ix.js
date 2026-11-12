@@ -1,0 +1,1 @@
+import{It as e,Lt as t}from"./KA_l3qHv.js";import{a as n,i as r,n as i}from"./BKVn604o.js";var a=a=>({Cast:{title:a(`cast`),icon:r.isCasting?t:e,color:r.isCasting?`primary`:`secondary`,$if:()=>r.availableDestinations.length>0&&r.availableDestinations[0].type===i.GCAST,onAction:()=>void n.showCastDialog()}});export{a as t};

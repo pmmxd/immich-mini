@@ -1,0 +1,1 @@
+import{Ft as e,It as t}from"./3_p3x7y4.js";import{a as n,i as r,n as i}from"./BVg3CMON.js";var a=a=>({Cast:{title:a(`cast`),icon:r.isCasting?t:e,color:r.isCasting?`primary`:`secondary`,$if:()=>r.availableDestinations.length>0&&r.availableDestinations[0].type===i.GCAST,onAction:()=>void n.showCastDialog()}});export{a as t};

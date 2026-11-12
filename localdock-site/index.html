@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Immich Mini Tools</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
+        background: #171b1a;
+        color: #f3f1eb;
+      }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+      }
+      main {
+        width: min(560px, calc(100vw - 40px));
+        padding: 28px;
+        border: 1px solid #34423e;
+        border-radius: 8px;
+        background: #1d2422;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 26px;
+      }
+      p {
+        margin: 0;
+        color: #aab2ad;
+        line-height: 1.6;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 22px;
+      }
+      button {
+        min-height: 40px;
+        padding: 0 18px;
+        border: 1px solid #4b625c;
+        border-radius: 6px;
+        background: #26312e;
+        color: #f3f1eb;
+        font: inherit;
+        cursor: pointer;
+      }
+      button.primary {
+        border-color: #55d2bc;
+        background: #55d2bc;
+        color: #10211d;
+        font-weight: 600;
+      }
+      button.danger {
+        border-color: #9b4646;
+        background: transparent;
+        color: #f0b7b7;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Immich Mini Tools</h1>
+      <p>Immich Mini 后端由 LocalDock 直接管理。请使用 LocalDock 中的“Immich Mini Backend”服务启动、停止或重启后端。</p>
+      <p id="status">此页面只提供外部工具桥接，不再重复启动 Node 进程。</p>
+      <div class="actions">
+        <button id="open" class="primary" type="button">打开照片</button>
+      </div>
+    </main>
+    <script>
+      const openButton = document.getElementById("open");
+      const appUrl = "http://127.0.0.1:3310/";
+      openButton.addEventListener("click", () => window.location.assign(appUrl));
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1 @@
+import{s as e}from"./BLaIv5St.js";function t(t,n){return e(t,n)}export{t};

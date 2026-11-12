@@ -1,0 +1,16 @@
+node_modules/
+/frontend/i18n/
+dist/
+data/
+logs/
+models/*.onnx
+runtime/
+ImmichMini.exe
+.codegraph/
+/tmp*/
+coverage/
+work/
+*.log
+.env
+.DS_Store
+Thumbs.db

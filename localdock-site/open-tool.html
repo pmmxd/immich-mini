@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>LocalDock 外部工具</title>
+    <script src="/__localdock/bridge.js"></script>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
+        background: #171b1a;
+        color: #f3f1eb;
+      }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+      }
+      main {
+        width: min(340px, calc(100vw - 32px));
+        padding: 24px;
+        border: 1px solid #34423e;
+        border-radius: 8px;
+        background: #1d2422;
+      }
+      p {
+        margin: 0;
+        color: #c5cec9;
+        line-height: 1.6;
+      }
+      button {
+        margin-top: 18px;
+        min-height: 36px;
+        padding: 0 16px;
+        border: 1px solid #4b625c;
+        border-radius: 6px;
+        background: #26312e;
+        color: #f3f1eb;
+        font: inherit;
+        cursor: pointer;
+      }
+      button[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p id="status" aria-live="polite">正在连接 LocalDock…</p>
+      <button id="close" type="button" hidden>关闭</button>
+    </main>
+    <script>
+      const status = document.getElementById("status");
+      const closeButton = document.getElementById("close");
+      const params = new URLSearchParams(location.search);
+      const action = params.get("action");
+      const files = JSON.parse(params.get("files") || "[]");
+      const requestId = params.get("requestId") || "";
+      const editor = params.get("editor") || "";
+
+      closeButton.addEventListener("click", () => window.close());
+
+      function jobResult(job) {
+        const jsonLine = String(job.output || "")
+          .split(/\r?\n/)
+          .reverse()
+          .find((line) => line.trim().startsWith("{"));
+        if (!jsonLine) {
+          throw new Error("LocalDock 任务没有返回结果");
+        }
+        return JSON.parse(jsonLine);
+      }
+
+      async function waitForBridge() {
+        if (window.LocalDock) return window.LocalDock;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (window.LocalDock) return window.LocalDock;
+        throw new Error("请从 LocalDock 打开此工具页面");
+      }
+
+      async function waitForJob(localDock, jobId, timeoutMs = 60_000) {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+          const { job } = await localDock.job(jobId);
+          if (job.status === "succeeded") {
+            return job;
+          }
+          if (["failed", "cancelled", "timeout"].includes(job.status)) {
+            throw new Error(String(job.output || "").trim() || job.error || `外部工具任务失败：${job.status}`);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        throw new Error("外部工具调用超时");
+      }
+
+      async function run() {
+        const localDock = await waitForBridge();
+        status.textContent = "正在启动外部工具…";
+        if (action !== "chooseFolder" && (!Array.isArray(files) || files.length === 0)) {
+          throw new Error("没有可打开的媒体");
+        }
+        let result = null;
+        if (action === "defaultOpen") {
+          for (const file of files) {
+            const started = await localDock.run(
+              "immich-open-default",
+              {},
+              { args: [file] },
+            );
+            await waitForJob(localDock, started.job.id);
+          }
+          status.textContent = `已用默认软件打开 ${files.length} 个媒体`;
+        } else if (action === "openWith") {
+          status.textContent = "正在打开系统应用选择器…";
+          if (files.length !== 1) {
+            throw new Error("系统“打开方式”一次只能打开一个媒体");
+          }
+          const started = await localDock.run(
+            "immich-open-with",
+            {},
+            { args: [files[0]] },
+          );
+          await waitForJob(localDock, started.job.id);
+          status.textContent = "已打开系统应用选择器";
+        } else if (action === "editor" || action === "frameEditor") {
+          if (!editor) {
+            throw new Error("未配置外部编辑软件");
+          }
+          const editorName = editor.split(/[\\/]/).pop()?.replace(/\.exe$/i, "") || "外部软件";
+          status.textContent = `正在启动 ${editorName}（${files.length} 个媒体）…`;
+          const started = await localDock.run(
+            action === "frameEditor" ? "immich-open-frame-tool" : "immich-open-editor",
+            {},
+            { args: [editor, ...files] },
+          );
+          await waitForJob(localDock, started.job.id);
+          status.textContent = `已用 ${editorName} 打开 ${files.length} 个媒体`;
+        } else if (action === "folder") {
+          status.textContent = files.length === 1 ? "正在定位文件…" : "正在打开媒体所在文件夹…";
+          const started = await localDock.run(
+            "immich-open-in-folder",
+            {},
+            { args: files },
+          );
+          await waitForJob(localDock, started.job.id);
+          status.textContent = files.length === 1 ? "已在文件夹中定位文件" : "已打开媒体所在文件夹";
+        } else if (action === "chooseFolder") {
+          status.textContent = "正在选择导出文件夹…";
+          const started = await localDock.run("immich-choose-folder", {}, { args: [] });
+          const job = await waitForJob(localDock, started.job.id, 5 * 60_000);
+          result = jobResult(job);
+          status.textContent = result.canceled ? "已取消选择文件夹" : "已选择导出文件夹";
+        } else if (action === "export") {
+          status.textContent = `正在导出 ${files.length} 个文件…`;
+          const started = await localDock.run(
+            "immich-export-media",
+            {},
+            { args: files },
+          );
+          const job = await waitForJob(localDock, started.job.id, 10 * 60_000);
+          result = jobResult(job);
+          if (result.canceled) {
+            status.textContent = "已取消导出";
+          } else if (result.failures?.length) {
+            status.textContent = `已导出 ${result.paths.length} 个，失败 ${result.failures.length} 个`;
+          } else {
+            status.textContent = `已导出 ${result.paths.length} 个文件`;
+          }
+        } else {
+          throw new Error("不支持的外部工具操作");
+        }
+        window.opener?.postMessage(
+          { type: "immich-localdock-tool", ok: true, action, result, requestId },
+          "http://127.0.0.1:3310",
+        );
+        window.parent?.postMessage(
+          { type: "immich-localdock-tool", ok: true, action, result, requestId },
+          "http://127.0.0.1:3310",
+        );
+      }
+
+      run().catch((error) => {
+        status.textContent = error instanceof Error ? error.message : String(error);
+        closeButton.hidden = false;
+        window.opener?.postMessage(
+          {
+            type: "immich-localdock-tool",
+            ok: false,
+            action,
+            error: status.textContent,
+            requestId,
+          },
+          "http://127.0.0.1:3310",
+        );
+        window.parent?.postMessage(
+          {
+            type: "immich-localdock-tool",
+            ok: false,
+            action,
+            error: status.textContent,
+            requestId,
+          },
+          "http://127.0.0.1:3310",
+        );
+      });
+    </script>
+  </body>
+</html>
